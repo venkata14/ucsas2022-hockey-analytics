@@ -59,7 +59,7 @@ We will explore tools in Python that will allow us to explore hockey data
 
 <br/>
 
-Goal: Visualize where on the field players took shots and scored
+Goal: Visualize where on the field skaters took shots and scored
 
 <br/>
 
@@ -121,11 +121,9 @@ http://statsapi.web.nhl.com/api/v1/game/2021020002/feed/live
 
 import requests
 
-game_data = []
-error_id = [] # Error collection
 year = '2021'
 season_type = '02' 
-max_game_ID = 100
+max_game_ID = 2000
 ```
 
 
@@ -134,19 +132,27 @@ max_game_ID = 100
 ## NHL API
 
 ```python
-
-
-# Make all 10 API requests
-for i in range(0,max_game_ID):
+def get_game(i):
     game_ID = year + season_type +str(i).zfill(4)
     try:
-        r = requests.get(url='http://statsapi.web.nhl.com/api/v1/game/'+ game_ID +'/feed/live', 
+        r = requests.get(url='http://statsapi.web.nhl.com/api/v1/game/'+ game_ID +'/feed/live',
                          timeout=5)
         data = r.json()
-        game_data.append(data)
-        # print('Finished ID', game_ID)
+        return data
     except:
-        error_id.append(game_ID)
+        pass
+```
+
+---
+
+## Speeding it up with `multiprocessing`
+
+```python
+import multiprocessing
+
+with multiprocessing.Pool(20) as pool:
+        game_Data = pool.map(get_game, range(1,max_game_ID))
+
 ```
 
 ---
@@ -164,7 +170,7 @@ knitr::include_graphics("images/nglapiextraction.jpg")
 ## Extracting Data from the request
 
 ```python
-# event, x, y, team_o (offence team), team_d (defending team), period, player_o, year, month
+# event, x, y, team_o (offence team), team_d (defending team), period, player_o, year, month, time_in_period, date_time
 
 master_data = []
 
@@ -211,12 +217,21 @@ We care of two event types- `Shot` and `Goal`
 
 ---
 
+class: middle, center
+
+```{r, out.width = "900px"}
+knitr::include_graphics("images/extracting_data_from_request.png")
+```
+
+
+---
+
 ## Data Manipulation
 
 Once you have all the data, you can convert it into a `pandas` DataFrame for easier analysis
 
 ```python
-df = pd.DataFrame(master_data, columns=['event', 'x', 'y', 'team_o', 'team_d', 'period', 'player_o', 'year', 'month'])
+df = pd.DataFrame(master_data, columns=['event', 'x', 'y', 'team_o', 'team_d', 'period', 'player_o', 'year', 'month', 'time', 'datetime'])
 ```
 
 ---
@@ -237,7 +252,104 @@ Now that we have all the data in the form we want, we can now start playing with
 
 --
 
+Lets say I want to rank skaters with the highest scoring average ... What should I do?
+
+---
+
+class: middle, center
+
+## Scoring Average Rank for Skaters
+
+```{r, out.width = "800px"}
+knitr::include_graphics("images/average_score_code.png")
+```
+
+---
+
+class: middle, center
+
+## Scoring Average Rank for Skaters
+
+```{r, out.width = "400px"}
+knitr::include_graphics("images/average_score_graph.png")
+```
+
+--
+
+Now say I want to do the same ... but with teams this time
+
+---
+
+class: middle, center
+
+## Scoring Average Rank for Teams
+
+```{r, out.width = "800px"}
+knitr::include_graphics("images/average_score_code_teams.png")
+```
+
+---
+
+class: middle, center
+
+## Scoring Average Rank for Teams
+
+```{r, out.width = "400px"}
+knitr::include_graphics("images/average_score_graph_teams.png")
+```
+
+--
+
+But this does not give us as much information as we want ... we can do better!
+
+---
+
+class: middle, center
+
+## Display of Goals and Shots for Teams
+
+```{r, out.width = "800px"}
+knitr::include_graphics("images/dashboard_code.png")
+```
+
+---
+
+class: middle, center
+
+## Display of Goals and Shots for Teams
+
+```{r, out.width = "400px"}
+knitr::include_graphics("images/dashboard_graph_useless.png")
+```
+
+---
+
+class: middle, center
+
+## Display of Goals and Shots for Teams (Improved)
+
+```{r, out.width = "400px"}
+knitr::include_graphics("images/dashboard_code_clean.png")
+```
+
+---
+
+class: middle, center
+
+
+```{r, out.width = "1000px"}
+knitr::include_graphics("images/dashboard_graph_useful.png")
+```
+
+
+
+
+---
+
+## Visualizing Goals
+
 Lets say I want to see where all the Goals scored on Tampa Bay Lightning were shot from, I can do a quick pandas filter and get all the data I need
+
 
 ```python
 coors = df[ (df['team_d'] == 'Tampa Bay Lightning') & (df['event'] == 'Goal') ][['x', 'y']]
@@ -255,12 +367,6 @@ knitr::include_graphics("images/coors.jpg")
 
 ---
 
-## Visualizing where the shots were taken
-
-We can look to see where Tampa Bay Lightning's defence tends to be weaker
-
----
-
 class: middle, center
 
 ## A note about the Coordinates!
@@ -275,41 +381,27 @@ knitr::include_graphics("images/Hockey-field.png")
 
 ---
 
-## A note about the Coordinates!
+class: middle, center
 
-```python
-def y_coor_aug(df):
-    mask_values = (df.x < 0).values.astype(np.int64)
-    return np.where(mask_values == 0, 1, -1)
-    
-```
+## Simple Visualization - Code
 
----
-
-## Simple Visualization
-
-```python
-y_mask = y_coor_aug(coors)
-x = coors.x.abs()
-y = coors.y * y_mask
-
-plt.scatter(x, y)
-plt.show()
+```{r, out.width = "800px"}
+knitr::include_graphics("images/teams_goals_pos.png")
 ```
 
 ---
 
 class: middle, center
 
-## Simple Visualization
+## Simple Visualization - Graph
 
-```{r, out.width = "600px"}
-knitr::include_graphics("images/simpleimage.png")
+```{r, out.width = "500px"}
+knitr::include_graphics("images/teams_goals_pos_graph_tampa_bad.png")
 ```
 
 ---
 
-## A Better Visualization
+## Improved Visualization - Code
 
 Place a picture of the field underneath the scatter plot
 
@@ -326,21 +418,12 @@ image_arr = image_arr.reshape(image.size[1], image.size[0], 4)
 
 ---
 
-## A Better Visualization
+class: middle, center
 
-```python
+## Improved Visualization - Code
 
-plt.imshow(image_arr, extent=[0,100, -42.5, 42.5])
-plt.scatter(x, y, marker="+", color="blue")
-
-ax = plt.gca() #get current axes
-
-#hide x-axis
-ax.get_xaxis().set_visible(False)
-ax.get_yaxis().set_visible(False)
-
-ax.spines[["right", 'left', "top", "bottom"]].set_visible(False)
-plt.show()
+```{r, out.width = "800px"}
+knitr::include_graphics("images/teams_goals_pos_tampa_clean_code.png")
 ```
 
 ---
@@ -348,14 +431,58 @@ plt.show()
 
 class: middle, center
 
-## A Better Visualization
+## Improved Visualization - Graph
 
-```{r, out.width = "600px"}
-knitr::include_graphics("images/betterimage.png")
+```{r, out.width = "400px"}
+knitr::include_graphics("images/teams_goals_pos_graph_tampa_good.png")
+```
+
+---
+
+
+class: middle, center
+
+## Improved Visualization - Graph
+
+```{r, out.width = "400px"}
+knitr::include_graphics("images/teams_goals_pos_graph_pitts_good.png")
 ```
 
 
+---
 
+
+class: middle, center
+
+## Visualization - Skaters
+
+Visualizing where Alex Overchkin takes his shots.
+
+```{r, out.width = "400px"}
+knitr::include_graphics("images/alex_nhl.png")
+```
+
+
+---
+
+
+class: middle, center
+
+## Visualization - Skaters
+
+Visualizing where Alex Overchkin scores.
+
+```{r, out.width = "400px"}
+knitr::include_graphics("images/alex_nhl_goal.png")
+```
+
+
+---
+
+
+class: middle, center
+
+# Thank you!
 
 
 
